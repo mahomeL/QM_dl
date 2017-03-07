@@ -6,7 +6,7 @@ import os
 from keras import backend as K
 from collections import Counter
 from tqdm import tqdm
-from qingmu_clothes_up_low_whole import get_files_len_from_path
+from clothes_up_low_whole import get_files_len_from_path
 K.set_image_dim_ordering('th')
 cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
 
@@ -64,28 +64,12 @@ def get_img_test_model_perfm(pic_classes='upper_body',
 ##pred
 
 def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1):
-    train_file_len = get_files_len_from_path(path=cur_path + r'clothes/' + train_or_valid ,
-                                             verbose=0)
-    valid_file_len = get_files_len_from_path(path =cur_path + r'clothes/' + train_or_valid ,
-                                             verbose=0)
-    # _clothes_classes = ['lower_body','upper_body','whole_body']
-    # if any([x in pic_classes for x in _clothes_classes]):
-    #     pic_classes =
-    # else: raise TypeError
-
+    cur_files_len = get_files_len_from_path(path=cur_path + r'clothes/' + train_or_valid,
+                                            verbose=0)
     pred_res_list = []
     img = get_img_test_model_perfm(pic_classes=pic_classes, train_or_valid=train_or_valid, verbose=verbose)
     true_classes = dict([('lower_body',0),('upper_body',1),('whole_body',2)])
     error_pic = []
-    if train_or_valid == 'train':
-        cur_files_len = train_file_len
-    elif train_or_valid=='validation':
-        cur_files_len = valid_file_len
-    elif train_or_valid == 'test':
-        cur_files_len = get_files_len_from_path(path =cur_path + r'clothes/' + train_or_valid,
-                                                verbose=1)
-    else:
-        raise TypeError
 
     if verbose:
         for i in range(1,cur_files_len[true_classes[pic_classes]]+1):
