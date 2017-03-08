@@ -78,7 +78,7 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
                 pred_res = model.predict(img.next())[0]
                 pred_res_list.append(np.argmax(pred_res))
                 if np.argmax(pred_res) != true_classes[pic_classes]:
-                    error_pic.append((i,pic_name,'%.4f'%pred_res[true_classes[pic_classes]]))
+                    error_pic.append((i,pic_name,'%.4f'%pred_res[true_classes[pic_classes]],np.argmax(pred_res),np.max(pred_res)))
                 print('{}-th pic'.format(i))
                 print('Predict Result:\nlower body :%.4f\nupper body :%.4f\nwhole body :%.4f\n'%tuple(pred_res))
             except StopIteration:
@@ -95,7 +95,8 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
                 pred_res = model.predict(img.next())[0]
                 pred_res_list.append(np.argmax(pred_res))
                 if np.argmax(pred_res) != true_classes[pic_classes]:
-                    error_pic.append((i,pic_name,'%.4f'%pred_res[true_classes[pic_classes]]))
+                    error_pic.append((i,pic_name,'%.4f'%pred_res[true_classes[pic_classes]],
+                                      np.argmax(pred_res),np.max(pred_res)))
                 # print('{}-th pic'.format(i))
                 # print('Predict Result:\nlower body :%.4f\nupper body :%.4f\nwhole body :%.4f\n' % tuple(pred_res))
             except StopIteration:
@@ -109,13 +110,13 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
     print('lower body :{}\nupper body :{}\nwhole body :{}'.format(pred_count[0],pred_count[1],pred_count[2]))
     print('\naccuracy :{:.3f}'.format(pred_count[true_classes[pic_classes]]/float(cur_files_len[true_classes[pic_classes]])))
     if len(error_pic):
-        print('\nerror pic (index,name,prob) is :\n{}'.format(error_pic))
+        print('\nerror pic (index,name,prob,er-class,er-prob) is :\n{}'.format(error_pic))
 
 
 ##RESULT
-_pic_classes='whole_body'
+_pic_classes='lower_body'
 _verbose=0
-_train_or_valid = 'test'
+_train_or_valid = 'validation'
 model_pred(pic_classes=_pic_classes,
            train_or_valid=_train_or_valid,
            verbose=_verbose)
