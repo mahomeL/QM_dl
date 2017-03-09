@@ -87,12 +87,10 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
             batch_size=32,
             class_mode='categorical')
 
-    early_moni = 'loss'
+    early_moni = 'acc'
     save_best_moni = 'val_loss'
     early_patience = 4
-    load_model_weights
-    load_model_art= cur_path + load_info+art_path
-    weihts_save_name = cur_path + save_info + weig_path
+
     print('************model info************\n')
     print('load weights path :{}\nload art path :{}\nsave weights path :{}'.format(load_model_weights,
                                                                                    load_model_art,
@@ -126,15 +124,15 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
     return model
 
 
-def main():
+def main(train='train',validation='validation',random_state = 20170309):
     print ('begin')
-    np.random.seed(20170308)
+    np.random.seed(random_state)
 
     cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
 
     os.chdir(cur_path)
-    train_data_dir = cur_path + 'clothes/train'
-    validation_data_dir = cur_path + 'clothes/validation'
+    train_data_dir = cur_path + 'clothes/'+ train
+    validation_data_dir = cur_path + 'clothes/' +validation
     # dimensions of our images.
     img_width, img_height = 350, 350
     dense_last2 = 256
@@ -155,9 +153,9 @@ def main():
     nb_classes = 3
     save_weights_flag = True
 
-    load_info = '0305_1try_'
+    load_info = '0308_1try_'
 
-    save_info = '0308_1try_'
+    save_info = '0309_1try_'
 
     weig_path = 'clothes_uplow_bnft_fine_tune_model.h5'
     art_path  = 'clothes_uplow_bnft_fine_tune_model_art.json'
