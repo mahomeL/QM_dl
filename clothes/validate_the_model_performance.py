@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from keras.models import model_from_json
 import numpy as np
-import cv2
 import os
 from keras import backend as K
 from collections import Counter
@@ -9,7 +8,7 @@ from tqdm import tqdm
 from clothes_up_low_whole import get_files_len_from_path
 K.set_image_dim_ordering('th')
 cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
-
+import cv2
 
 #ori_model
 # model = model_from_json(open(cur_path + '0305_1try_clothes_uplow_model_ori_art.json').read())
@@ -17,7 +16,7 @@ cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
 
 #fine_tune_model
 model = model_from_json(open(cur_path + '0305_1try_clothes_uplow_bnft_fine_tune_model_art.json').read())
-model.load_weights(cur_path + '0305_1try_clothes_uplow_bnft_fine_tune_model.h5')
+model.load_weights(cur_path + '0309_2try_clothes_uplow_bnft_fine_tune_model.h5')
 
 
 
@@ -114,9 +113,9 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
 
 
 ##RESULT
-_pic_classes='lower_body'
+_pic_classes='whole_body'
 _verbose=0
-_train_or_valid = 'validation'
+_train_or_valid = 'test'
 model_pred(pic_classes=_pic_classes,
            train_or_valid=_train_or_valid,
            verbose=_verbose)

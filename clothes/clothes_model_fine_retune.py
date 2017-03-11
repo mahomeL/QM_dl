@@ -52,7 +52,8 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
                               img_width=350,img_height=350,
                               save_weights_flag=True,nb_epoch=20):
     load_model_weights = cur_path + load_info+weig_path
-    load_model_art= cur_path + load_info+art_path
+    # load_model_art= cur_path + load_info+art_path
+    load_model_art = cur_path + '0305_1try_' + art_path
     weihts_save_name = cur_path + save_info + weig_path
 
     model = model_from_json(open(load_model_art).read())
@@ -88,8 +89,8 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
             class_mode='categorical')
 
     early_moni = 'acc'
-    save_best_moni = 'val_loss'
-    early_patience = 4
+    save_best_moni = 'acc'
+    early_patience = 2
 
     print('************model info************\n')
     print('load weights path :{}\nload art path :{}\nsave weights path :{}'.format(load_model_weights,
@@ -109,9 +110,9 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
     for layer in model.layers[:15]:
         layer.trainable = False
 
-    print('after set, layer trainable ')
-    for i, layer in enumerate(model.layers):
-        print(i, layer.name,layer.trainable)
+    # print('after set, layer trainable ')
+    # for i, layer in enumerate(model.layers):
+    #     print(i, layer.name,layer.trainable)
 
     model.fit_generator(
             train_generator,
@@ -124,7 +125,9 @@ def clothes_model_fine_retune(cur_path,load_info,save_info,
     return model
 
 
-def main(train='train',validation='validation',random_state = 20170309):
+def main(train='train',validation='validation',
+         load_info='0309_1try_',save_info = '0309_2try_',
+         random_state = 20170309):
     print ('begin')
     np.random.seed(random_state)
 
@@ -139,6 +142,7 @@ def main(train='train',validation='validation',random_state = 20170309):
 
     train_file_len = get_files_len_from_path(path=train_data_dir)
     valid_file_len = get_files_len_from_path(path=validation_data_dir)
+    assert len(train_file_len)==len(valid_file_len)==3
     samples_train_low = train_file_len[0]
     samples_train_up = train_file_len[1]
     samples_train_whole = train_file_len[2]
@@ -153,9 +157,9 @@ def main(train='train',validation='validation',random_state = 20170309):
     nb_classes = 3
     save_weights_flag = True
 
-    load_info = '0308_1try_'
 
-    save_info = '0309_1try_'
+
+
 
     weig_path = 'clothes_uplow_bnft_fine_tune_model.h5'
     art_path  = 'clothes_uplow_bnft_fine_tune_model_art.json'
@@ -165,4 +169,6 @@ def main(train='train',validation='validation',random_state = 20170309):
                                       nb_train_samples,nb_validation_samples)
 
 if __name__ == '__main__':
-    main()
+    main(train='test',validation='validation',
+         load_info='0309_1try_',save_info='0309_2try_',
+         random_state=20170310)
