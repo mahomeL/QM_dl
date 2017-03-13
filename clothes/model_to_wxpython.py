@@ -5,6 +5,7 @@ import os
 from keras.models import model_from_json
 import cv2
 import numpy as np
+import pandas as pd
 from keras import backend as K
 from collections import Counter
 K.set_image_dim_ordering('th')
@@ -18,7 +19,7 @@ class ClfModel():
 
         self.model_archi = model_archi
         self.model_weigh = model_weigh
-        self.input_files = input_pic
+        self.input_files_path = input_pic
         self.output_path = output_path
         self.pic_width = 350
         self.pic_height = 350
@@ -74,7 +75,7 @@ class ClfModel():
 
     def _model_predict(self):
         '''predict pic by model'''
-        img = self._build_model_input(self.input_files)
+        img = self._build_model_input(self.input_files_path)
 
         _tmp_pred_class = []
         for i in range(1,self.input_len+1):
@@ -87,7 +88,7 @@ class ClfModel():
             self.output_res.append([self.input_pic_name[-1],pred_prob,pred_class])  #picname,prob,class
         self.output_res_summary.append(Counter(_tmp_pred_class))
 
-    def _model_clf_valid(self,file_dir_path,true_class,verbose = True):
+    def _model_clf_valid(self,file_dir_path,true_class,verbose = True,to_csv = ''):
         """ clf pic in dir knowing it's true class
         @ file_dir_path: this file only contain 'true_class' pic """
         assert true_class in self.pic_classes_str2num.keys()
@@ -105,28 +106,38 @@ class ClfModel():
             pred_class = np.argmax(pred_prob)
             _tmp_pred_class.append(pred_class)
 
-            if pred_class != self.pic_classes_str2num[true_class]:
-                self.output_res_error.append([self.input_pic_name[-1],
-                                              self.pic_classes_num2str[pred_class],
-                                              true_class,pred_prob ]) #name,pred-c,true-c,prob
-
-            _tmp_res = [self.input_pic_name[-1],self.pic_classes_num2str[pred_class],pred_prob]  # picname,pred-c,prob
-            self.output_res.append(_tmp_res)
+            _tmp_res = [self.input_pic_name[-1], self.pic_classes_num2str[pred_class],
+                        pred_prob[0], pred_prob[1], pred_prob[2]] #name,pred-c,prob
             if verbose:
                 print (_tmp_res)
+
+            if pred_class != self.pic_classes_str2num[true_class]:
+                self.output_res_error.append(_tmp_res)
+            else :
+                self.output_res.append(_tmp_res)
+
 
         self.output_res_summary.append(Counter(_tmp_pred_class))
         _tmp_accuracy = round(float(self.output_res_summary[0][self.pic_classes_str2num[true_class]])/self.input_len,4)
         self.output_res_summary.append(_tmp_accuracy)
+
         if verbose:
-            print('pictures class count:{}\n accuracy:{}'.format(self.output_res_summary[0],self.output_res_summary[1]))
+            print('\n****ERROR****')
+            print(self.output_res_error)
+            print('\npictures class count:{}\naccuracy:{}'.format(self.output_res_summary[0],self.output_res_summary[1]))
+        if to_csv:
+            pd_res = pd.DataFrame(data=self.output_res + self.output_res_error,
+                                  columns=['pic_name','predict_class','lower_body_prob','upper_body_prob','whole_body_prob'])
+            _out_name = true_class +'_' +to_csv + '.csv'
+            pd_res.to_csv(os.path.join(self.output_path,_out_name),header=True)
+
 
 
 
 if __name__=='__main__':
     model_archi = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0305_1try_clothes_uplow_bnft_fine_tune_model_art.json'
     model_weigh = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0309_2try_clothes_uplow_bnft_fine_tune_model.h5'
-    input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/validation/lower_body'
+    input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/validation/whole_body'
     output_path =''
     test_model = ClfModel(model_archi,model_weigh,input_pic,output_path)
-    test_model._model_clf_valid(input_pic,true_class='lower_body')
+    test_model._model_clf_valid(input_pic,true_class='whole_body',verbose=True,to_csv='20170313_valid_whole_body')
