@@ -85,6 +85,7 @@ class ClfModel():
         _tmp_data = img.next()  # in order to get input_len
         for i in range(1,self.input_len+1):
             pred_prob = self.model.predict(_tmp_data)[0]
+            cur_pic_name = self.input_pic_name[-1]
             try:
                 _tmp_data = img.next()
             except StopIteration:
@@ -94,7 +95,7 @@ class ClfModel():
             pred_class = np.argmax(pred_prob)
             _tmp_pred_class.append(pred_class)
 
-            _tmp_res = [self.input_pic_name[-1],self.pic_classes_num2str[pred_class],
+            _tmp_res = [cur_pic_name,self.pic_classes_num2str[pred_class],
                         pred_prob[0],pred_prob[1],pred_prob[2]]
             self.output_res.append(_tmp_res)  # picname,p-class,prob
 
@@ -128,6 +129,7 @@ class ClfModel():
         _tmp_data = img.next() #in order to get input_len
         for i in range(1, self.input_len + 1):
             pred_prob = self.model.predict(_tmp_data)[0]
+            cur_pic_name = self.input_pic_name[-1]
             if i<self.input_len:  #StopInter error
                 _tmp_data = img.next()
             pred_prob = np.array(pred_prob).tolist()
@@ -135,7 +137,7 @@ class ClfModel():
             pred_class = np.argmax(pred_prob)
             _tmp_pred_class.append(pred_class)
 
-            _tmp_res = [self.input_pic_name[-1], self.pic_classes_num2str[pred_class],
+            _tmp_res = [cur_pic_name, self.pic_classes_num2str[pred_class],
                         pred_prob[0], pred_prob[1], pred_prob[2]] #name,pred-c,prob
             if verbose:
                 print ('{}/{} ===> {}'.format(i,self.input_len,_tmp_res))
