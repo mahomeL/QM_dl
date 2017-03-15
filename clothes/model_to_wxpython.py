@@ -2,6 +2,7 @@
 
 '''Reconstruct model input-output to fit wxpython'''
 import os
+import datetime
 from keras.models import model_from_json
 import cv2
 import numpy as np
@@ -32,6 +33,8 @@ class ClfModel():
         self.output_res_summary = []
         self.output_res_error = []
 
+        self.be_finished = False
+
         self.pic_classes_str2num= dict([('lower_body', 0), ('upper_body', 1), ('whole_body', 2)])
         self.pic_classes_num2str= dict([(v,k) for k,v in self.pic_classes_str2num.items() ])
 
@@ -45,6 +48,7 @@ class ClfModel():
         self.output_res = []
         self.output_res_summary = []
         self.output_res_error = []
+        self.be_finished = False
 
     def _build_model_input(self,files_path):
         '''read pictures and resize it '''
@@ -78,15 +82,41 @@ class ClfModel():
         img = self._build_model_input(self.input_files_path)
 
         _tmp_pred_class = []
+        _tmp_data = img.next()  # in order to get input_len
         for i in range(1,self.input_len+1):
-            pred_prob = self.model.predict(img.next())[0]
+            pred_prob = self.model.predict(_tmp_data)[0]
+            try:
+                _tmp_data = img.next()
+            except StopIteration:
+                self.be_finished = True
             pred_prob = np.array(pred_prob).tolist()
             pred_prob = map(lambda x:round(x,4),pred_prob)
             pred_class = np.argmax(pred_prob)
             _tmp_pred_class.append(pred_class)
 
-            self.output_res.append([self.input_pic_name[-1],pred_prob,pred_class])  #picname,prob,class
-        self.output_res_summary.append(Counter(_tmp_pred_class))
+            _tmp_res = [self.input_pic_name[-1],self.pic_classes_num2str[pred_class],
+                        pred_prob[0],pred_prob[1],pred_prob[2]]
+            self.output_res.append(_tmp_res)  # picname,p-class,prob
+
+            if self.be_finished:
+                self.output_res_summary.append(Counter(_tmp_pred_class))
+
+                pd_res = pd.DataFrame(data=self.output_res,
+                                      columns=['pic_name', 'predict_class', 'lower_body_prob', 'upper_body_prob',
+                                               'whole_body_prob'])
+                now = datetime.datetime.now()
+                _out_name = 'qingmu_luw_'+now.strftime('%m-%d-%H-%M-%S') + '.csv'
+                pd_res.to_csv(os.path.join(self.output_path, _out_name), header=True)
+
+
+            yield _tmp_res #for printing output at once
+
+
+
+
+    def _model_predict_for_wx(self,pic_idx):
+        pass
+
 
     def _model_clf_valid(self,file_dir_path,true_class,verbose = True,to_csv = ''):
         """ clf pic in dir knowing it's true class
@@ -98,9 +128,8 @@ class ClfModel():
         _tmp_data = img.next() #in order to get input_len
         for i in range(1, self.input_len + 1):
             pred_prob = self.model.predict(_tmp_data)[0]
-            if i<self.input_len:
+            if i<self.input_len:  #StopInter error
                 _tmp_data = img.next()
-
             pred_prob = np.array(pred_prob).tolist()
             pred_prob = map(lambda x: round(x, 4), pred_prob)
             pred_class = np.argmax(pred_prob)
@@ -109,7 +138,7 @@ class ClfModel():
             _tmp_res = [self.input_pic_name[-1], self.pic_classes_num2str[pred_class],
                         pred_prob[0], pred_prob[1], pred_prob[2]] #name,pred-c,prob
             if verbose:
-                print (_tmp_res)
+                print ('{}/{} ===> {}'.format(i,self.input_len,_tmp_res))
 
             if pred_class != self.pic_classes_str2num[true_class]:
                 self.output_res_error.append(_tmp_res)
@@ -137,7 +166,7 @@ class ClfModel():
 if __name__=='__main__':
     model_archi = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0305_1try_clothes_uplow_bnft_fine_tune_model_art.json'
     model_weigh = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0309_2try_clothes_uplow_bnft_fine_tune_model.h5'
-    input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/validation/whole_body'
-    output_path =''
+    input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/validation/lower_body'
+    output_path ='/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu'
     test_model = ClfModel(model_archi,model_weigh,input_pic,output_path)
-    test_model._model_clf_valid(input_pic,true_class='whole_body',verbose=True,to_csv='20170313_valid_whole_body')
+    test_model._model_clf_valid(input_pic,true_class='lower_body',verbose=True,to_csv='20170314_test_lower_body')
