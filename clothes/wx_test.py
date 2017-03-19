@@ -70,7 +70,7 @@ class MyFrame(wx.Frame):
         self.load_pic.Bind(wx.EVT_DIRPICKER_CHANGED,self.event_getpath,self.load_pic)
         self.output_res.Bind(wx.EVT_DIRPICKER_CHANGED, self.event_getpath, self.output_res)
 
-        self.ctrl_output_name.Bind(wx.EVT_TEXT,self.on_text_path)
+        # self.ctrl_output_name.Bind(wx.EVT_TEXT,self.on_text_path)
         self.ctrl_output_name_button.Bind(wx.EVT_BUTTON,self.on_text_path_sure)
 
         self.gauge_training.Bind(wx.EVT_IDLE,self.do_gauge)
@@ -85,6 +85,7 @@ class MyFrame(wx.Frame):
         self.model_weigh = self.load_model_weigh.GetPath()
         self.input_files_path = self.load_pic.GetPath()
         self.output_path = self.output_res.GetPath()
+        self.output_csv_name = ''
 
         """layout"""
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -101,9 +102,20 @@ class MyFrame(wx.Frame):
         #ctrl_text and it's button
         left_down_sizer = wx.BoxSizer(wx.HORIZONTAL)
         left_down_sizer.Add(self.ctrl_output_name,1,wx.EXPAND)
+
         left_down_sizer.Add(self.ctrl_output_name_button,0)
-        left_sizer.Add(self.sizer_model_staticbox('Input-dir Output-file', text=[self.text_load_pic, self.text_res_output,self.text_output_name],
-                                                  item=[self.load_pic, self.output_res , self.ctrl_output_name]),1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
+
+
+        left_sizer.Add(self.sizer_model_staticbox('Input-dir Output-file', text=[self.text_load_pic, self.text_res_output],
+                                                  item=[self.load_pic, self.output_res ]),1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
+
+        left_sizer.Add((10, 10))
+        left_sizer.Add(self.text_output_name,0)
+        left_sizer.Add(left_down_sizer,0,wx.EXPAND)
+
+
+
+
 
 
         middle_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -140,18 +152,44 @@ class MyFrame(wx.Frame):
         print(event.GetPath())
 
 
-    def on_text_path(self):
+    def on_text_path(self,event):
         """
+        //TO BE DELETED
         result output file name
         :return: set result output csv name
         """
+        if self.ctrl_output_name_button.GetLabel=='saved':
+            _name = self.ctrl_output_name.GetValue()
+            print(len(_name))
+            if _name:
+                pass
+            else:
+                now = datetime.datetime.now()
+                _out_name = 'qingmu_luw_' + now.strftime('%m-%d-%H-%M-%S') + '.csv'
+                self.ctrl_output_name.SetValue(_out_name)
+        self.ctrl_output_name.Disable()
 
-        now = datetime.datetime.now()
-        _out_name = 'qingmu_luw_' + now.strftime('%m-%d-%H-%M-%S') + '.csv'
-        self.ctrl_output_name.SetValue()
+    def on_text_path_sure(self,event):
+        if self.ctrl_output_name_button.GetLabel() == 'save':
+            self.ctrl_output_name_button.SetLabel('saved')
+            _name = self.ctrl_output_name.GetValue().encode('utf-8')
+            print(len(_name))
+            if not _name:
+                wx.MessageBox("If you don't set output file name,we will set name by date time:'%m-%d-%H-%M-%S.csv' ")
+                now = datetime.datetime.now()
+                _out_name = 'qingmu_luw_' + now.strftime('%m-%d-%H-%M-%S') + '.csv'
+                self.ctrl_output_name.SetValue(_out_name)
+            else:
+                self.ctrl_output_name.SetValue(_name)
+            self.output_csv_name = self.ctrl_output_name.GetValue()
+            self.ctrl_output_name.Disable()
 
-    def on_text_path_sure(self):
-        pass
+        elif self.ctrl_output_name_button.GetLabel() == 'saved':
+            self.ctrl_output_name_button.SetLabel('save')
+            self.ctrl_output_name.Enable()
+        else:
+            print('error')
+
 
     def sizer_model_staticbox(self,boxlabel,text,item):
         """
@@ -210,9 +248,9 @@ class MyFrame(wx.Frame):
             # self.button_clf.Disable()
             event.GetEventObject().Disable()
             if self.valid_path():
-
                 MyThread(self.model_archi.encode('utf-8'),self.model_weigh.encode('utf-8'),
-                         self.input_files_path.encode('utf-8'),self.output_path.encode('utf-8') )
+                         self.input_files_path.encode('utf-8'),self.output_path.encode('utf-8'),
+                         self.output_csv_name.encode('utf-8'))
             else:
                 self.button_clf.SetLabel('Classify')
                 self.button_clf.Enable()
@@ -251,9 +289,12 @@ class MyFrame(wx.Frame):
             self.log_is_begin=False
         elif isinstance(msg,str):
             self.logging_output.AppendText('\n*********'+msg+ '\n\n')
-            self.logging_output.AppendText('Predict result has been saved in \n{}'.format(self.output_path))
+            self.logging_output.AppendText('Predict result has been saved in \n{}'.format(os.path.join(self.output_path,self.output_csv_name)))
             self.button_clf.SetLabel('Classify')
             self.button_clf.Enable()
+            self.ctrl_output_name_button.SetLabel('save')
+            self.ctrl_output_name.Enable()
+            self.ctrl_output_name.Clear()
             self._is_begin = True
         else:
             self.logging_output.AppendText('Something Error!!!' + '\n\n')
@@ -263,16 +304,17 @@ class MyThread(Thread):
     """
     multi thread and update model output
     """
-    def __init__(self,model_archi,model_weigh,input_files_path,output_path):
+    def __init__(self,model_archi,model_weigh,input_files_path,output_path,output_csv_name):
         """
         init thread and get model init path
         :param model_archi: archi path
         :param model_weigh: weigh path
         :param input_pic: input pic path
         :param output_path: output result path
+        :param output_csv_name: output file csv name
         """
         Thread.__init__(self)
-        self.model = ClfModel(model_archi, model_weigh, input_files_path, output_path)
+        self.model = ClfModel(model_archi, model_weigh, input_files_path, output_path,output_csv_name)
         self.pic_len = 0
         self.pic_count = 0
         self.start()

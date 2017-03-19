@@ -13,13 +13,14 @@ from collections import Counter
 K.set_image_dim_ordering('th')
 
 class ClfModel():
-    def __init__(self,model_archi,model_weigh,input_pic,output_path):
+    def __init__(self,model_archi,model_weigh,input_pic,output_path,output_csv_name):
         """
         load model ; set input pic and output result
         :param model_archi: archi path
         :param model_weigh: weigh path
         :param input_pic: input pic path
         :param output_path: output result path
+        :param output_csv_name:output result csv name
         """
         assert isinstance(model_archi,str) and isinstance(model_weigh,str)
         assert model_archi.split('.')[-1]=='json','model architecture must be *.json'
@@ -29,6 +30,7 @@ class ClfModel():
         self.model_weigh = model_weigh
         self.input_files_path = input_pic
         self.output_path = output_path
+        self.output_csv_name = output_csv_name
         self.pic_width = 350
         self.pic_height = 350
 
@@ -123,9 +125,14 @@ class ClfModel():
                 pd_res = pd.DataFrame(data=self.output_res,
                                       columns=['pic_name', 'predict_class', 'lower_body_prob', 'upper_body_prob',
                                                'whole_body_prob'])
-                now = datetime.datetime.now()
-                _out_name = 'qingmu_luw_'+now.strftime('%m-%d-%H-%M-%S') + '.csv'
-                pd_res.to_csv(os.path.join(self.output_path, _out_name), header=True)
+                # now = datetime.datetime.now()
+                # _out_name = 'qingmu_luw_'+now.strftime('%m-%d-%H-%M-%S') + '.csv'
+                if self.output_csv_name in ['no','NO']:
+                    pass
+                elif '.' not in self.output_csv_name:
+                    pd_res.to_csv(os.path.join(self.output_path, self.output_csv_name+'.csv'), header=True)
+                else:
+                    pd_res.to_csv(os.path.join(self.output_path, self.output_csv_name), header=True)
 
 
             yield _tmp_res #for printing output at once
