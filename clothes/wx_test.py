@@ -9,14 +9,22 @@ import os
 from model_to_wxpython import *
 from wx.lib.pubsub import pub as Publisher
 from threading import Thread
+import datetime
 
 class MyFrame(wx.Frame):
     def __init__(self,parent=None,title ='my title',size=(800,600)):
+        """
+        build wxpython frame, including it's layout,event,control
+        :param parent: none
+        :param title: software name
+        :param size: softsware size
+        """
         wx.Frame.__init__(self,parent=parent,
                           title=title,size=size)
         self.Centre()
         self.panel = wx.Panel(self,-1)
         self.gauge_count = 0
+        self.log_is_begin = True
 
         self.model_archi = ''
         self.model_weigh = ''
@@ -37,14 +45,17 @@ class MyFrame(wx.Frame):
 
         self.text_load_pic = wx.StaticText(self.panel,-1,'pictures folder(must only contain pictures):')
         self.text_res_output = wx.StaticText(self.panel, -1, 'result output folder:')
-        self.load_pic = wx.DirPickerCtrl(self.panel,4,path='path_to_pic',size=(400,-1),message='abc') #message is tips when browse path
-        self.output_res = wx.DirPickerCtrl(self.panel,4, path='output_result', size=(400, -1), message='abc111')
+        self.load_pic = wx.DirPickerCtrl(self.panel,4,path='path_to_pic',size=(400,-1),message='input must be dir') #message is tips when browse path
+        self.output_res = wx.DirPickerCtrl(self.panel,4, path='output_result', size=(400, -1), message='output must be dir')
+
+        self.text_output_name = wx.StaticText(self.panel,-1,'save predict result name(*.csv):')
+        self.ctrl_output_name = wx.TextCtrl(self.panel,-1)
+        self.ctrl_output_name_button =wx.Button(self.panel,-1,'save')
 
         self.gauge_training = wx.Gauge(self.panel,-1)
-        # self.gauge_training.SetBezelFace(3)
-
         self.text_logging = wx.StaticText(self.panel,-1,'process log:')
         self.logging_output = wx.TextCtrl(self.panel,-1,style =wx.TE_MULTILINE|wx.TE_RICH,size=(400,80))
+
 
 
         # self.button_clf = wx.Button(self.panel,-1,'Classify',size=(100,100),)
@@ -58,6 +69,9 @@ class MyFrame(wx.Frame):
 
         self.load_pic.Bind(wx.EVT_DIRPICKER_CHANGED,self.event_getpath,self.load_pic)
         self.output_res.Bind(wx.EVT_DIRPICKER_CHANGED, self.event_getpath, self.output_res)
+
+        self.ctrl_output_name.Bind(wx.EVT_TEXT,self.on_text_path)
+        self.ctrl_output_name_button.Bind(wx.EVT_BUTTON,self.on_text_path_sure)
 
         self.gauge_training.Bind(wx.EVT_IDLE,self.do_gauge)
 
@@ -84,9 +98,12 @@ class MyFrame(wx.Frame):
         left_sizer.Add(self.sizer_model_staticbox('Load Model',text=[self.text_archi,self.text_weigh],
                                                   item=[self.load_model_archi,self.load_model_weigh]),1,flag=wx.EXPAND)
         left_sizer.Add((10,10))
-        left_sizer.Add(self.sizer_model_staticbox('Input-file Output-file', text=[self.text_load_pic, self.text_res_output],
-                                                  item=[self.load_pic, self.output_res]),1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
-
+        #ctrl_text and it's button
+        left_down_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        left_down_sizer.Add(self.ctrl_output_name,1,wx.EXPAND)
+        left_down_sizer.Add(self.ctrl_output_name_button,0)
+        left_sizer.Add(self.sizer_model_staticbox('Input-dir Output-file', text=[self.text_load_pic, self.text_res_output,self.text_output_name],
+                                                  item=[self.load_pic, self.output_res , self.ctrl_output_name]),1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
 
 
         middle_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -95,18 +112,18 @@ class MyFrame(wx.Frame):
         middle_top_sizer.Add(self.gauge_training, 1,flag=wx.EXPAND)
         middle_sizer.Add(middle_top_sizer,1,flag=wx.EXPAND)
         middle_sizer.Add((10,10))
-        # middle_sizer.Add(self.sizer_model_staticbox('Result',text=[self.text_logging],item=[self.logging_output]) ,1,wx.EXPAND|wx.ALL)
         log_box = wx.StaticBox(self.panel, -1, 'Result')
         logsizer = wx.StaticBoxSizer(log_box, wx.VERTICAL)
         logsizer.Add(self.sizer_load_model(self.text_logging,self.logging_output,flag=wx.EXPAND|wx.ALL), 1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
         middle_sizer.Add(logsizer,1,flag=wx.BOTTOM|wx.EXPAND|wx.ALL)
 
+
         core_sizer = wx.BoxSizer(wx.HORIZONTAL)
         core_sizer.Add(left_sizer,1,flag=wx.LEFT|wx.EXPAND|wx.ALL)
         core_sizer.Add(middle_sizer,1,flag=wx.EXPAND|wx.ALL)
 
-        main_sizer.Add(core_sizer,1,wx.ALL,5)
 
+        main_sizer.Add(core_sizer,1,wx.ALL,5)
         self.panel.SetSizer(main_sizer)
         main_sizer.Fit(self)
 
@@ -115,13 +132,35 @@ class MyFrame(wx.Frame):
 
 
     def event_getpath(self,event):
-        '''get browse file/dir path'''
+        """
+        get browse file/dir path
+        :param event: button
+        :return: file/dir absolute path
+        """
         print(event.GetPath())
 
 
+    def on_text_path(self):
+        """
+        result output file name
+        :return: set result output csv name
+        """
+
+        now = datetime.datetime.now()
+        _out_name = 'qingmu_luw_' + now.strftime('%m-%d-%H-%M-%S') + '.csv'
+        self.ctrl_output_name.SetValue()
+
+    def on_text_path_sure(self):
+        pass
 
     def sizer_model_staticbox(self,boxlabel,text,item):
-        '''build staticbox for model and pic'''
+        """
+        build staticbox for model and pic
+        :param boxlabel: box title
+        :param text: button name
+        :param item:button
+        :return:static box sizer
+        """
         box = wx.StaticBox(self.panel,-1,boxlabel)
         sizer = wx.StaticBoxSizer(box,wx.VERTICAL)
 
@@ -134,7 +173,13 @@ class MyFrame(wx.Frame):
 
 
     def sizer_load_model(self,label,item,flag=wx.LEFT|wx.EXPAND):
-        '''build text-pickle sizer'''
+        """
+        build text-pickle sizer
+        :param label: button name
+        :param item: button
+        :param flag: layout
+        :return: sizer
+        """
         model_sizer = wx.BoxSizer(wx.VERTICAL)
         model_sizer.Add(label,0,flag = wx.LEFT)
         model_sizer.Add(item,0,flag = flag)
@@ -142,7 +187,11 @@ class MyFrame(wx.Frame):
 
 
     def do_gauge(self,gauge_msg):
-        '''process gauge '''
+        """
+        process gauge
+        :param gauge_msg: the message that update gauge flag
+        :return: none
+        """
         if isinstance(gauge_msg,int):
             self.gauge_count = gauge_msg
             if self.gauge_count >= 100:
@@ -150,6 +199,11 @@ class MyFrame(wx.Frame):
             self.gauge_training.SetValue(self.gauge_count)
 
     def begin_classify(self,event):
+        """
+        Classify button and begin predict
+        :param event: none
+        :return: none
+        """
         # print(self.button_clf.GetValue())
         if self.button_clf.GetValue():
             self.button_clf.SetLabel('waiting...')
@@ -164,6 +218,10 @@ class MyFrame(wx.Frame):
                 self.button_clf.Enable()
 
     def valid_path(self):
+        """
+        file/dir path and it's effectiveness
+        :return: bool
+        """
         _path1 = self.load_model_archi.GetPath()
         _valid_path1 = os.path.isfile(_path1) and _path1[-5:]=='.json'
         _path2 = self.load_model_weigh.GetPath()
@@ -181,21 +239,38 @@ class MyFrame(wx.Frame):
         else:return False
 
     def dologging(self,msg):
-        '''print output predict result on panel'''
+        """
+        print output predict result on panel
+        :param msg: logging content
+        :return: none
+        """
+        if self.log_is_begin:
+            self.logging_output.Clear()
         if isinstance(msg,list):
             self.logging_output.AppendText(str(msg)+'\n\n') #str for print
+            self.log_is_begin=False
         elif isinstance(msg,str):
             self.logging_output.AppendText('\n*********'+msg+ '\n\n')
             self.logging_output.AppendText('Predict result has been saved in \n{}'.format(self.output_path))
             self.button_clf.SetLabel('Classify')
             self.button_clf.Enable()
+            self._is_begin = True
         else:
             self.logging_output.AppendText('Something Error!!!' + '\n\n')
 
 
 class MyThread(Thread):
-    '''multi thread and update model output'''
+    """
+    multi thread and update model output
+    """
     def __init__(self,model_archi,model_weigh,input_files_path,output_path):
+        """
+        init thread and get model init path
+        :param model_archi: archi path
+        :param model_weigh: weigh path
+        :param input_pic: input pic path
+        :param output_path: output result path
+        """
         Thread.__init__(self)
         self.model = ClfModel(model_archi, model_weigh, input_files_path, output_path)
         self.pic_len = 0
@@ -203,6 +278,10 @@ class MyThread(Thread):
         self.start()
 
     def run(self):
+        """
+        rewrite to funtion-run to begin multi threads
+        :return: none
+        """
         output_msg = self.model._model_predict()
         pic_msg = output_msg.next()
         self.pic_len = self.model.input_len
@@ -223,16 +302,30 @@ class MyThread(Thread):
 
 
     def sending_msg(self,output_msg):
+        """
+        sending logging content(model predict prob)
+        :param output_msg: content
+        :return: none
+        """
         Publisher.sendMessage('update',msg = output_msg)
 
     def sending_gauge_msg(self,g_msg):
+        """
+        sending gauge updating msg
+        :param g_msg: gauge msg
+        :return: none
+        """
         Publisher.sendMessage('update_gauge', gauge_msg=g_msg)
 
 
 class GetClothesApp(wx.App):
     '''build APP'''
     def OnInit(self):
-        frame = MyFrame(title='QingMu clothes V1.1')
+        """
+        build App
+        :return:
+        """
+        frame = MyFrame(title='QingMu DeepLearning V1.1')
         frame.Show()
         return True
 

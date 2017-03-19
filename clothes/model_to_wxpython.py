@@ -8,12 +8,19 @@ import cv2
 import numpy as np
 import pandas as pd
 from keras import backend as K
+import pickle
 from collections import Counter
 K.set_image_dim_ordering('th')
 
 class ClfModel():
     def __init__(self,model_archi,model_weigh,input_pic,output_path):
-        '''load model ; set input pic and output result'''
+        """
+        load model ; set input pic and output result
+        :param model_archi: archi path
+        :param model_weigh: weigh path
+        :param input_pic: input pic path
+        :param output_path: output result path
+        """
         assert isinstance(model_archi,str) and isinstance(model_weigh,str)
         assert model_archi.split('.')[-1]=='json','model architecture must be *.json'
         assert model_weigh.split('.')[-1]=='h5','model weights must be *.h5'
@@ -42,6 +49,10 @@ class ClfModel():
         self.model.load_weights(self.model_weigh)
 
     def _output_reset(self):
+        """
+        reset input-output result
+        :return:
+        """
         self.input_count = 0
         self.input_len = 0
         self.input_pic_name = []
@@ -51,7 +62,11 @@ class ClfModel():
         self.be_finished = False
 
     def _build_model_input(self,files_path):
-        '''read pictures and resize it '''
+        """
+        read pictures and resize it
+        :param files_path: input pictures path
+        :return: generator to produce a resized picture
+        """
         self._output_reset()
         assert os.path.isdir(files_path)
         files = os.listdir(files_path)
@@ -78,7 +93,10 @@ class ClfModel():
             yield img
 
     def _model_predict(self):
-        '''predict pic by model'''
+        """
+        predict pic by model,not valid
+        :return: generator to produce predict result[pic-name,p-class,prob]
+        """
         img = self._build_model_input(self.input_files_path)
 
         _tmp_pred_class = []
@@ -97,7 +115,7 @@ class ClfModel():
 
             _tmp_res = [cur_pic_name,self.pic_classes_num2str[pred_class],
                         pred_prob[0],pred_prob[1],pred_prob[2]]
-            self.output_res.append(_tmp_res)  # picname,p-class,prob
+            self.output_res.append(_tmp_res)  # pic-name,p-class,prob
 
             if self.be_finished:
                 self.output_res_summary.append(Counter(_tmp_pred_class))
@@ -116,12 +134,23 @@ class ClfModel():
 
 
     def _model_predict_for_wx(self,pic_idx):
+        """
+        //TODO for wxpython
+        :param pic_idx:
+        :return:
+        """
         pass
 
 
     def _model_clf_valid(self,file_dir_path,true_class,verbose = True,to_csv = ''):
-        """ clf pic in dir knowing it's true class
-        @ file_dir_path: this file only contain 'true_class' pic """
+        """
+        clf pic in dir knowing it's true class
+        :param file_dir_path: this file only contain 'true_class' pic
+        :param true_class: picture class
+        :param verbose: print each pic name and it's prob
+        :param to_csv: result name to csv
+        :return:
+        """
         assert true_class in self.pic_classes_str2num.keys()
         img = self._build_model_input(files_path=file_dir_path)
 
@@ -159,16 +188,54 @@ class ClfModel():
         if to_csv:
             pd_res = pd.DataFrame(data=self.output_res + self.output_res_error,
                                   columns=['pic_name','predict_class','lower_body_prob','upper_body_prob','whole_body_prob'])
-            _out_name = true_class +'_' +to_csv + '.csv'
+            _out_name = to_csv +'_Tcls_' + true_class + '.csv'
             pd_res.to_csv(os.path.join(self.output_path,_out_name),header=True)
-
 
 
 
 if __name__=='__main__':
     model_archi = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0305_1try_clothes_uplow_bnft_fine_tune_model_art.json'
     model_weigh = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/0309_2try_clothes_uplow_bnft_fine_tune_model.h5'
-    input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/validation/lower_body'
-    output_path ='/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu'
-    test_model = ClfModel(model_archi,model_weigh,input_pic,output_path)
-    test_model._model_clf_valid(input_pic,true_class='lower_body',verbose=True,to_csv='20170314_test_lower_body')
+    _tr_te_vali = ['test','validation','train']
+    _my_classes = ['lower_body','upper_body','whole_body']
+    output_path = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu'
+
+
+    # input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/' + _tr_te_vali + '/' + _my_classes
+    # to_csv = '20170316_' + _tr_te_vali + '_' + _my_classes
+    # print ('cate: {} \n class: {}'.format(_tr_te_vali,_my_classes))
+    # test_model = ClfModel(model_archi,model_weigh,input_pic,output_path)
+    # test_model._model_clf_valid(input_pic,true_class=_my_classes,verbose=True,to_csv=to_csv)
+
+
+
+    ##for run all files
+    error_pic = []
+    for _cate in _tr_te_vali:
+        if _cate =='validation' or _cate =='train':
+            _my_classes = ['lower_body', 'upper_body', 'whole_body']
+        else:
+            _my_classes = ['whole_body_2','lower_body','upper_body' ,'whole_body_1']
+        for _cls in _my_classes:
+            input_pic = '/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/' + _cate + '/' + _cls
+            to_csv = '20170316_Pcls_'  + _cls + '_' +  _cate
+            print ('cate: {} \nclass: {}'.format(_cate, _cls))
+            test_model = ClfModel(model_archi, model_weigh, input_pic, output_path)
+            true_class = _cls
+            if _cls in ['whole_body_2','whole_body_1']:
+                true_class = 'whole_body'
+            test_model._model_clf_valid(input_pic, true_class=true_class, verbose=True, to_csv=to_csv)
+            _err = [_cate,_cls,test_model.output_res_error]
+            print('****{}'.format(_err))
+            error_pic.append(_err)
+
+    print ('\n\n\n**************\n\n')
+    print (error_pic)
+    error_pkl_file = open(output_path + '/' + 'error_pic.pkl','wb')
+    pickle.dump(error_pic,error_pkl_file)
+    error_pkl_file.close()
+
+
+    #test:
+    #valid:
+    #train:
