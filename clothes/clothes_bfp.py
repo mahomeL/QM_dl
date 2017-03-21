@@ -19,7 +19,7 @@ from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_a
 
 
 K.set_image_dim_ordering('th')
-np.random.seed(20170321)
+np.random.seed(20170320)
 
 
 cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
@@ -28,7 +28,7 @@ os.chdir(cur_path)
 train_data_dir = cur_path + 'clothes/train'
 validation_data_dir = cur_path + 'clothes/validation'
 img_width, img_height = 350, 350
-dense_last2 = 512
+dense_last2 = 128
 
 pic_classes = ['back','front','profile']
 
@@ -70,11 +70,15 @@ nb_epoch = 20
 LL_IsDebug = False
 nb_classes = 3
 
-save_info = '0321_1try_'
+save_info = '0321_2try_'
 
 save_weights_flag = True
-
+class_weight = {0:0.35,
+                1:0.15,
+                2:0.5}
 classes_ab = 'bfp'
+
+
 
 get_model_ori_weights_save_name = save_info+'clothes_'+classes_ab+'_model_ori_weights.h5'
 get_model_ori_art_save_name = save_info+'clothes_'+classes_ab+'_model_ori_art.json'
@@ -87,6 +91,19 @@ bnft_clf_model_art_save_name = save_info+'clothes_'+classes_ab+'_bnft_clf_model_
 
 bnft_finetune_model_weights_save_name = save_info+'clothes_'+classes_ab+'_bnft_fine_tune_model.h5'
 bnft_finetune_model_art_save_name = save_info+'clothes_'+classes_ab+'_bnft_fine_tune_model_art.json'
+
+train_datagen = ImageDataGenerator(
+        rescale=1. / 255,
+        # samplewise_center=True,
+        shear_range=0,
+        rotation_range=0,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        fill_mode='nearest',
+        vertical_flip=False,
+        zoom_range=0.1,
+        horizontal_flip=True,
+    )
 
 
 def get_model_ori(save_name = get_model_ori_weights_save_name,
@@ -120,15 +137,15 @@ def get_model_ori(save_name = get_model_ori_weights_save_name,
                   optimizer='rmsprop', #rmsprop
                   metrics=['accuracy'])
 
-    train_datagen = ImageDataGenerator(
-            rescale=1./255,
-            # samplewise_center=True,
-            shear_range=0.,
-            rotation_range=0.2,
-            fill_mode='nearest',
-            vertical_flip=True,
-            horizontal_flip=True,
-            )
+    # train_datagen = ImageDataGenerator(
+    #         rescale=1./255,
+    #         # samplewise_center=True,
+    #         shear_range=0.,
+    #         rotation_range=0.2,
+    #         fill_mode='nearest',
+    #         vertical_flip=True,
+    #         horizontal_flip=True,
+    #         )
 
     test_datagen = ImageDataGenerator(rescale=1./255)
 
@@ -151,23 +168,23 @@ def get_model_ori(save_name = get_model_ori_weights_save_name,
                                 save_weights_only=save_weights_flag
                                 )
     print ('model input_shape:{}'.format(model.input_shape))
-    # model.fit_generator(
-    #         train_generator,
-    #         samples_per_epoch=nb_train_samples,
-    #         nb_epoch=nb_epoch + 10,
-    #         validation_data=validation_generator,
-    #         nb_val_samples=nb_validation_samples,
-    #         verbose=1,
-    #         callbacks=[save_best,early_stopping])#
+    model.fit_generator(
+            train_generator,
+            samples_per_epoch=nb_train_samples,
+            nb_epoch=nb_epoch + 10,
+            validation_data=validation_generator,
+            nb_val_samples=nb_validation_samples,
+            verbose=1,
+            callbacks=[save_best,early_stopping])#
 
     from keras.models import model_from_json
     # save
-    if get_model_ori_art_save_name:
-        json_str = model.to_json()
-        with open(get_model_ori_art_save_name, 'w') as f:
-            f.write(json_str)
-
-    return model
+    # if get_model_ori_art_save_name:
+    #     json_str = model.to_json()
+    #     with open(get_model_ori_art_save_name, 'w') as f:
+    #         f.write(json_str)
+    #
+    # return model
 
 
 
@@ -176,15 +193,15 @@ def get_v16_bnft(save_train_bn_ft_name = get_v16_bnft_train_save_name,
 
     model = VGG16(weights='imagenet', include_top=False)
 
-    train_datagen = ImageDataGenerator(
-        rescale=1. / 255,
-        # samplewise_center=True,
-        shear_range=0.,
-        rotation_range=0.2,
-        fill_mode='nearest',
-        vertical_flip=True,
-        horizontal_flip=True,
-    )
+    # train_datagen = ImageDataGenerator(
+    #     rescale=1. / 255,
+    #     # samplewise_center=True,
+    #     shear_range=0.,
+    #     rotation_range=0.2,
+    #     fill_mode='nearest',
+    #     vertical_flip=True,
+    #     horizontal_flip=True,
+    # )
 
 
     test_datagen = ImageDataGenerator(rescale=1. / 255)
@@ -240,11 +257,11 @@ def get_bnft_clf_model(load_train_bn_ft_name=get_v16_bnft_train_save_name,
 
     model.add(Dense(nb_classes, activation='softmax'))
 
-    model.compile(optimizer='rmsprop', #rmsprop
+    model.compile(optimizer='adam', #rmsprop
                   loss='categorical_crossentropy',
                   metrics=['accuracy'])
 
-    early_stopping = EarlyStopping(monitor='loss', patience=8, verbose=1)
+    # early_stopping = EarlyStopping(monitor='loss', patience=8, verbose=1)
     save_best = ModelCheckpoint(save_name,
                                 verbose=1, monitor='val_loss',
                                 save_best_only=True,
@@ -252,8 +269,9 @@ def get_bnft_clf_model(load_train_bn_ft_name=get_v16_bnft_train_save_name,
                                 )
 
     model.fit(train_data, train_labels,verbose=1,shuffle=True,
-              callbacks=[early_stopping,save_best],
+              callbacks=[save_best],
               nb_epoch=nb_epoch+30, batch_size=32, #50,32
+              class_weight=class_weight,
               validation_data=(validation_data, validation_labels))
 
     json_str = model.to_json()
@@ -318,15 +336,15 @@ def get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_na
                   metrics=['accuracy'])
 
     # prepare data augmentation configuration
-    train_datagen = ImageDataGenerator(
-            rescale=1./255,
-            # samplewise_center=True,
-            shear_range=0.,
-            rotation_range=0.2,
-            fill_mode='nearest',
-            vertical_flip=True,
-            horizontal_flip=True
-            )
+    # train_datagen = ImageDataGenerator(
+    #         rescale=1./255,
+    #         # samplewise_center=True,
+    #         shear_range=0.,
+    #         rotation_range=0.2,
+    #         fill_mode='nearest',
+    #         vertical_flip=True,
+    #         horizontal_flip=True
+    #         )
 
     test_datagen = ImageDataGenerator(rescale=1./255)
 
@@ -390,7 +408,7 @@ def save_load_model(model,is_save_only = True,is_load_only = True,
 if __name__ == '__main__':
     print ('begin')
     # get_model_ori()
-    # get_v16_bnft()
+    get_v16_bnft()
     #
-    get_bnft_clf_model()
-    get_bnft_fine_tune_model()
+    # get_bnft_clf_model()
+    # get_bnft_fine_tune_model()
