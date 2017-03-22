@@ -22,19 +22,6 @@ from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_a
 K.set_image_dim_ordering('th')
 np.random.seed(20170320)
 
-
-cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
-
-os.chdir(cur_path)
-train_data_dir = cur_path + 'clothes/train'
-validation_data_dir = cur_path + 'clothes/validation'
-img_width, img_height = 350, 350
-dense_last2 = 256
-batch_size = 128
-
-
-pic_classes = ['back','front','profile']
-
 def get_files_len_from_path(path=r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/train',
                             verbose = 0):
     # l u w
@@ -81,8 +68,8 @@ def _load_resized_pics(pic_path):
             img[:, :, c] -= mean_pixel[c]
 
         img = cv2.resize(img, (350, 350))
-        # img = img.transpose((2, 0, 1))
-        img = np.expand_dims(img, axis=0)
+        img = img.transpose((2, 0, 1))
+        # img = np.expand_dims(img, axis=0)
         pic_array.append(img)
     return pic_array
 
@@ -93,6 +80,7 @@ def load_train_valid_pic(data_dir):
     while '.DS_Store' in files:
         files.remove('.DS_Store')
     class_len = len(files)
+    print (data_dir)
     print ('classes len : {}'.format(class_len))
 
     x_data = []
@@ -102,13 +90,27 @@ def load_train_valid_pic(data_dir):
         x_data += tmp
         y_data_len.append(len(tmp))
 
-    y_data = np.zeros((sum(y_data_len), 1))
-    for i, class_len_i in enumerate(y_data_len, 1):
-        if i < len(y_data_len):
-            y_data[class_len_i:y_data_len[i], 1] = i
+    _tmp = []
+    for i,cut_len in enumerate(y_data_len):
+        _tmp += [i]*cut_len
+    y_data = np.array(_tmp)
+
     y_data = np_utils.to_categorical(y_data, nb_classes=len(y_data_len))
 
-    return x_data, y_data
+    return np.array(x_data), y_data
+
+
+cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
+
+os.chdir(cur_path)
+train_data_dir = cur_path + 'clothes/train'
+validation_data_dir = cur_path + 'clothes/validation'
+img_width, img_height = 350, 350
+dense_last2 = 256
+batch_size = 128
+
+
+pic_classes = ['back','front','profile']
 
 
 train_file_len = get_files_len_from_path(path=train_data_dir)
@@ -162,10 +164,12 @@ train_datagen = ImageDataGenerator(
         horizontal_flip=True,
     )
 
-use_generator = True
+use_generator = False
 if not use_generator:
     X_train, y_train = load_train_valid_pic(train_data_dir)
     X_valid,y_valid = load_train_valid_pic(validation_data_dir)
+    print('X_train shape\t:{}'.format(X_train.shape))
+    print('X_valid shape\t:{}'.format(X_valid.shape))
 
 
 def get_model_ori(save_name = get_model_ori_weights_save_name,
@@ -434,7 +438,7 @@ def get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_na
 
     early_stopping = EarlyStopping(monitor='val_loss',patience=8,verbose=1)
     save_best = ModelCheckpoint(save_name,
-                                verbose=1,monitor='val_loss',
+                                verbose=1,monitor='val_acc',
                                 save_best_only=True,
                                 save_weights_only=save_weights_flag
                                 )

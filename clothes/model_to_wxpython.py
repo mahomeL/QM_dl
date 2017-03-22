@@ -90,7 +90,7 @@ class ClfModel():
             img = img.astype(np.float32, copy=False)
             for c in range(3):
                 img[:, :, c] = img[:, :, c] / 255.0
-            img = img.transpose((2, 0, 1))
+            img = img.transpose((2, 0, 1))   #beacause th:channel,hei,wid; tf:hei,wid,channel
             img = np.expand_dims(img, axis=0)
             yield img
 

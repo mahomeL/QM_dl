@@ -45,12 +45,14 @@ def get_img_test_model_perfm(pic_classes='upper_body',
       # print('resized img shape:{}'.format(img.shape))
       img = img.astype(np.float32, copy=False)
 
+      mean_pixel = [103.939, 116.799, 123.68]
+      for c in range(3):
+          img[:, :, c] = img[:, :, c] - mean_pixel[c]
+
       for c in range(3):
          img[:, :, c] = img[:, :, c]/255.0
 
-      # mean_pixel = [103.939, 116.799, 123.68]
-      # for c in range(3):
-      #    resized[:, :, c] = resized[:, :, c] - mean_pixel[c]
+
 
       img = img.transpose((2, 0, 1))
       # print('transpose img shape:{}'.format(img.shape))
@@ -67,9 +69,14 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
                                             verbose=0)
     pred_res_list = []
     img = get_img_test_model_perfm(pic_classes=pic_classes, train_or_valid=train_or_valid, verbose=verbose)
-    true_classes = dict([('lower_body',0),('upper_body',1),('whole_body',2)])
+    # true_classes = dict([('lower_body',0),('upper_body',1),('whole_body',2)])
+    true_classes = dict([('back', 0), ('front', 1), ('profile', 2)])
+    true_classes_num2str = {v:k for k,v in true_classes.items()}
     error_pic = []
 
+    pr_str= '{}\t:%.4f\n{}\t:%.4f\n{}\t:%.4f\n'.format(true_classes_num2str[0],
+                                                    true_classes_num2str[1],
+                                                    true_classes_num2str[2])
     if verbose:
         for i in range(1,cur_files_len[true_classes[pic_classes]]+1):
             try:
@@ -79,7 +86,8 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
                 if np.argmax(pred_res) != true_classes[pic_classes]:
                     error_pic.append((i,pic_name,'%.4f'%pred_res[true_classes[pic_classes]],np.argmax(pred_res),np.max(pred_res)))
                 print('{}-th pic'.format(i))
-                print('Predict Result:\nlower body :%.4f\nupper body :%.4f\nwhole body :%.4f\n'%tuple(pred_res))
+                # print('lower body :%.4f\nupper body :%.4f\nwhole body :%.4f\n'%tuple(pred_res))
+                print(pr_str % tuple(pred_res))
             except StopIteration:
                 print('current stop-i:{}'.format(i))
                 break
@@ -98,6 +106,7 @@ def model_pred(pic_classes='lower_body', train_or_valid='validation', verbose=1)
                                       np.argmax(pred_res),np.max(pred_res)))
                 # print('{}-th pic'.format(i))
                 # print('Predict Result:\nlower body :%.4f\nupper body :%.4f\nwhole body :%.4f\n' % tuple(pred_res))
+                # print(pr_str%tuple(pred_res))
             except StopIteration:
                 print('current stop-i:{}'.format(i))
                 break
