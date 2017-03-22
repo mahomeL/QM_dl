@@ -12,29 +12,28 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.models import model_from_json
 
 K.set_image_dim_ordering('th')
-from clothes_bfp import load_train_valid_pic,_load_resized_pics
+import clothes_bfp
 
 
-def get_files_len_from_path(path=r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/train',
+def get_files_len_from_path(pic_classes,path=r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/train',
                             verbose = 0):
-    # l u w
-    file_len =[]
+    file_len = []
 
     file_menu = os.listdir(path)
     if '.DS_Store' in file_menu:
         file_menu.remove('.DS_Store')
     # print (file_menu)
     # 'lower_body''upper_body''whole_body'
-    assert (file_menu[0]=='lower_body' and file_menu[1]=='upper_body'
-            and file_menu[2] == 'whole_body'),'should have folder [lower_body,upper_body,whole_body'
+    assert (file_menu[0] == pic_classes[0] and file_menu[1] == pic_classes[1]
+            and file_menu[2] == pic_classes[2]), 'should have folder {}'.format(pic_classes)
     for menu_i in file_menu:
-        sour_pics_name = os.listdir(path + r'/'+menu_i)
+        sour_pics_name = os.listdir(path + r'/' + menu_i)
         if '.DS_Store' in sour_pics_name:
             sour_pics_name.remove('.DS_Store')
         sour_pics_len = len(sour_pics_name)
         file_len.append(sour_pics_len)
     if verbose:
-        print('files_len:{}, total_sum:{}'.format(file_len,sum(file_len)))
+        print('files_len:{}, total_sum:{}'.format(file_len, sum(file_len)))
 
     return file_len
 
@@ -119,9 +118,6 @@ def clothes_model_fine_retune(cur_path,load_wei_info,load_ari_info,save_info,
     for layer in model.layers[:freeze_num]:
         layer.trainable = False
 
-    # print('after set, layer trainable ')
-    # for i, layer in enumerate(model.layers):
-    #     print(i, layer.name,layer.trainable)
 
     if use_dir_generator:
         model.fit_generator(
@@ -133,8 +129,10 @@ def clothes_model_fine_retune(cur_path,load_wei_info,load_ari_info,save_info,
                 validation_data=validation_generator,
                 nb_val_samples=nb_validation_samples)
     else:
-        X_train, y_train = load_train_valid_pic(train_data_dir)
-        X_valid, y_valid = load_train_valid_pic(validation_data_dir)
+        X_train = np.load(open('bfp_x.train'))
+        y_train = np.load(open('bfp_y.train'))
+        X_valid = np.load(open('bfp_x.valid'))
+        y_valid = np.load(open('bfp_y.valid'))
         print('X_train shape\t:{}'.format(X_train.shape))
         print('X_valid shape\t:{}'.format(X_valid.shape))
         model.fit_generator(train_datagen.flow(X_train, y_train, batch_size=batch_size),
@@ -153,19 +151,20 @@ if __name__ == '__main__':
 
     ###need be change by user
     save_info = '0321_2try_'
-    wei_info = '0321_2try'
-    ari_info = '0321_2try'
+    wei_info = '0321_2try_'
+    ari_info = '0321_2try_'
     classes_ab = 'bfp'
     np.random.seed(20170322)
     train_data_dir = cur_path + 'clothes/train'
     validation_data_dir = cur_path + 'clothes/validation'
+    pic_classes=['back','front','profile']
     ######
 
     weig_path = 'clothes_' + classes_ab + '_bnft_fine_tune_model.h5'
     art_path = 'clothes_' + classes_ab + '_bnft_fine_tune_model_art.json'
     os.chdir(cur_path)
-    train_file_len = get_files_len_from_path(path=train_data_dir)
-    valid_file_len = get_files_len_from_path(path=validation_data_dir)
+    train_file_len = get_files_len_from_path(pic_classes,path=train_data_dir)
+    valid_file_len = get_files_len_from_path(pic_classes,path=validation_data_dir)
     nb_train_samples = sum(train_file_len)
     nb_validation_samples = sum(valid_file_len)
 

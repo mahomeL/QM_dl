@@ -22,7 +22,7 @@ from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_a
 K.set_image_dim_ordering('th')
 np.random.seed(20170320)
 
-def get_files_len_from_path(path=r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/train',
+def get_files_len_from_path(pic_classes,path=r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/clothes/train',
                             verbose = 0):
     # l u w
     file_len =[]
@@ -74,7 +74,7 @@ def _load_resized_pics(pic_path):
     return pic_array
 
 
-def load_train_valid_pic(data_dir):
+def load_train_valid_pic(data_dir,is_write=False,save_name_x='bfp_x.train',save_name_y='bfp_y.train'):
     assert os.path.isdir(data_dir)
     files = os.listdir(data_dir)
     while '.DS_Store' in files:
@@ -96,87 +96,16 @@ def load_train_valid_pic(data_dir):
     y_data = np.array(_tmp)
 
     y_data = np_utils.to_categorical(y_data, nb_classes=len(y_data_len))
-
+    if is_write:
+        np.save(open(save_name_x,'w'),np.array(x_data))
+        np.save(open(save_name_y, 'w'), y_data)
     return np.array(x_data), y_data
 
 
-cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
 
-os.chdir(cur_path)
-train_data_dir = cur_path + 'clothes/train'
-validation_data_dir = cur_path + 'clothes/validation'
-img_width, img_height = 350, 350
-dense_last2 = 256
-batch_size = 128
-
-
-pic_classes = ['back','front','profile']
-
-
-train_file_len = get_files_len_from_path(path=train_data_dir)
-valid_file_len = get_files_len_from_path(path=validation_data_dir)
-samples_train_low = train_file_len[0]
-samples_train_up = train_file_len[1]
-samples_train_whole = train_file_len[2]
-nb_train_samples = sum(train_file_len)
-samples_valid_low = valid_file_len[0]
-samples_valid_up = valid_file_len[1]
-samples_valid_whole = valid_file_len[2]
-nb_validation_samples = sum(valid_file_len)
-
-nb_epoch = 20
-LL_IsDebug = False
-nb_classes = 3
-
-save_info = '0321_2try_'
-
-save_weights_flag = True
-class_weight = {0:0.35, #b
-                1:0.15, #f
-                2:0.5}  #p
-classes_ab = 'bfp'
-
-
-
-
-get_model_ori_weights_save_name = save_info+'clothes_'+classes_ab+'_model_ori_weights.h5'
-get_model_ori_art_save_name = save_info+'clothes_'+classes_ab+'_model_ori_art.json'
-
-get_v16_bnft_train_save_name = save_info+'clothes_'+classes_ab+'_model_16_bn_ft_train.npy'
-get_v16_bnft_valid_save_name = save_info+'clothes_'+classes_ab+'_model_16_bn_ft_valid.npy'
-
-bnft_clf_model_weights_save_name = save_info+'clothes_'+classes_ab+'_bnft_clf_model_weights.h5'
-bnft_clf_model_art_save_name = save_info+'clothes_'+classes_ab+'_bnft_clf_model_art.json'
-
-bnft_finetune_model_weights_save_name = save_info+'clothes_'+classes_ab+'_bnft_fine_tune_model.h5'
-bnft_finetune_model_art_save_name = save_info+'clothes_'+classes_ab+'_bnft_fine_tune_model_art.json'
-
-train_datagen = ImageDataGenerator(
-        rescale=1. / 255,
-        # samplewise_center=True,
-        shear_range=0,
-        rotation_range=0,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        fill_mode='nearest',
-        vertical_flip=False,
-        zoom_range=0.1,
-        horizontal_flip=True,
-    )
-
-use_generator = False
-if not use_generator:
-    X_train, y_train = load_train_valid_pic(train_data_dir)
-    X_valid,y_valid = load_train_valid_pic(validation_data_dir)
-    print('X_train shape\t:{}'.format(X_train.shape))
-    print('X_valid shape\t:{}'.format(X_valid.shape))
-
-
-def get_model_ori(save_name = get_model_ori_weights_save_name,
-                  save_weights_flag = save_weights_flag,
-                  batch_size=batch_size,art_name =get_model_ori_art_save_name,
+def get_model_ori(save_name ,save_weights_flag,
+                  art_name,batch_size,
                   use_dir_generator=True):
-
     model = Sequential()
     model.add(Convolution2D(32, 3, 3, input_shape=(3, img_width, img_height)))
     model.add(Activation('relu'))
@@ -245,6 +174,10 @@ def get_model_ori(save_name = get_model_ori_weights_save_name,
                 verbose=1,
                 callbacks=[save_best,early_stopping])#
     else:
+        X_train = np.load(open('bfp_x.train'))
+        y_train = np.load(open('bfp_y.train'))
+        X_valid = np.load(open('bfp_x.valid'))
+        y_valid = np.load(open('bfp_y.valid'))
         model.fit_generator(train_datagen.flow(X_train, y_train, batch_size=batch_size),
                             samples_per_epoch=nb_train_samples,
                             nb_epoch=nb_epoch + 10,
@@ -255,18 +188,16 @@ def get_model_ori(save_name = get_model_ori_weights_save_name,
 
     from keras.models import model_from_json
     # save
-    # if get_model_ori_art_save_name:
-    #     json_str = model.to_json()
-    #     with open(get_model_ori_art_save_name, 'w') as f:
-    #         f.write(json_str)
-    #
-    # return model
+    if get_model_ori_art_save_name:
+        json_str = model.to_json()
+        with open(get_model_ori_art_save_name, 'w') as f:
+            f.write(json_str)
+
+    return model
 
 
 
-def get_v16_bnft(save_train_bn_ft_name = get_v16_bnft_train_save_name,
-                 save_valid_bn_ft_name=get_v16_bnft_valid_save_name,
-                 ):
+def get_v16_bnft(save_train_bn_ft_name,save_valid_bn_ft_name):
 
     model = VGG16(weights='imagenet', include_top=False)
 
@@ -306,26 +237,29 @@ def get_v16_bnft(save_train_bn_ft_name = get_v16_bnft_train_save_name,
 
 
 
-def get_bnft_clf_model(load_train_bn_ft_name=get_v16_bnft_train_save_name,
-                       load_valid_bn_ft_name=get_v16_bnft_valid_save_name,
-                       save_name = bnft_clf_model_weights_save_name,
-                       save_art_name = bnft_clf_model_art_save_name,
-                       save_weights_flag = save_weights_flag
+def get_bnft_clf_model(load_train_bn_ft_name,load_valid_bn_ft_name,
+                       save_name ,save_art_name ,save_weights_flag
                        ):
 
     train_data = np.load(open(load_train_bn_ft_name))
     print('train_data shape {}'.format(train_data.shape))
-    train_labels = np.array([0] * samples_train_low + [1] * samples_train_up + [2] * samples_train_whole)
+    _tmp = []
+    for i, cut_len in enumerate(train_file_len):
+        _tmp += [i] * cut_len
+    train_labels = np.array(_tmp)
     train_labels = np_utils.to_categorical(train_labels,nb_classes)
     print('train_labels shape {}'.format(train_labels.shape))
 
     validation_data = np.load(open(load_valid_bn_ft_name))
-    validation_labels = np.array([0] * samples_valid_low + [1] * samples_valid_up + [2] * samples_valid_whole)
-    validation_labels = np_utils.to_categorical(validation_labels,nb_classes)
+    _tmp = []
+    for i, cut_len in enumerate(valid_file_len):
+        _tmp += [i] * cut_len
+    validation_labels = np.array(_tmp)
+    validation_labels = np_utils.to_categorical(validation_labels, nb_classes)
     print('valid_data shape {}'.format(validation_data.shape))
     print ('nb_classes {}'.format(nb_classes))
-    model = Sequential()
 
+    model = Sequential()
     model.add(Flatten(input_shape=train_data.shape[1:]))
     model.add(Dense(dense_last2, activation='relu'))
     model.add(Dropout(0.5))
@@ -360,10 +294,8 @@ def get_bnft_clf_model(load_train_bn_ft_name=get_v16_bnft_train_save_name,
 
 
 
-def get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_name,
-                             save_name = bnft_finetune_model_weights_save_name,
-                             save_art_name=bnft_finetune_model_art_save_name,
-                             save_weights_flag=save_weights_flag,use_dir_generator=True):
+def get_bnft_fine_tune_model(load_bnft_clf_name,save_name,save_art_name,
+                             save_weights_flag,use_dir_generator=True):
     base_model = VGG16(weights='imagenet',include_top=False,input_shape=(3,img_width, img_height))
     print('base model input shape {}'.format(base_model.input_shape))
 
@@ -400,12 +332,7 @@ def get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_na
     for layer in model.layers[:11]: #train last two block
         layer.trainable = False
 
-    # print('after set, layer trainable ')
-    # for i, layer in enumerate(model.layers):
-    #     print(i, layer.name,layer.trainable)
 
-    # compile the model with a SGD/momentum optimizer
-    # and a very slow learning rate.
     from keras import optimizers
     model.compile(loss='categorical_crossentropy',
                   optimizer=optimizers.SGD(lr=1e-4, momentum=0.9),
@@ -455,6 +382,12 @@ def get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_na
                 validation_data=validation_generator,
                 nb_val_samples=nb_validation_samples)
     else:
+        X_train = np.load(open('bfp_x.train'))
+        y_train = np.load(open('bfp_y.train'))
+        X_valid = np.load(open('bfp_x.valid'))
+        y_valid = np.load(open('bfp_y.valid'))
+        print('X_train shape\t:{}'.format(X_train.shape))
+        print('X_valid shape\t:{}'.format(X_valid.shape))
         model.fit_generator(train_datagen.flow(X_train, y_train, batch_size=batch_size),
                             samples_per_epoch=nb_train_samples,
                             nb_epoch=nb_epoch + 20,
@@ -494,9 +427,88 @@ def save_load_model(model,is_save_only = True,is_load_only = True,
 
 
 if __name__ == '__main__':
-    print ('begin')
+    print ('*******begin******')
 
-    # get_model_ori(use_dir_generator = use_generator)
-    # get_v16_bnft()
-    # get_bnft_clf_model()
-    get_bnft_fine_tune_model(use_dir_generator = use_generator)
+    cur_path = r'/Users/l_mahome/Documents/KAGGLE/open_vgg16_other/qingmu/'
+
+    os.chdir(cur_path)
+    train_data_dir = cur_path + 'clothes/train'
+    validation_data_dir = cur_path + 'clothes/validation'
+    img_width, img_height = 350, 350
+    dense_last2 = 256
+    batch_size = 128
+
+    pic_classes = ['back', 'front', 'profile']
+
+    train_file_len = get_files_len_from_path(pic_classes, path=train_data_dir)
+    valid_file_len = get_files_len_from_path(pic_classes, path=validation_data_dir)
+    nb_train_samples = sum(train_file_len)
+    nb_validation_samples = sum(valid_file_len)
+
+    nb_epoch = 20
+    LL_IsDebug = False
+    nb_classes = 3
+
+    save_info = '0321_2try_'
+
+    save_weights_flag = True
+    class_weight = {0: 0.35,  # b
+                    1: 0.15,  # f
+                    2: 0.5}  # p
+    classes_ab = 'bfp'
+
+    get_model_ori_weights_save_name = save_info + 'clothes_' + classes_ab + '_model_ori_weights.h5'
+    get_model_ori_art_save_name = save_info + 'clothes_' + classes_ab + '_model_ori_art.json'
+
+    get_v16_bnft_train_save_name = save_info + 'clothes_' + classes_ab + '_model_16_bn_ft_train.npy'
+    get_v16_bnft_valid_save_name = save_info + 'clothes_' + classes_ab + '_model_16_bn_ft_valid.npy'
+
+    bnft_clf_model_weights_save_name = save_info + 'clothes_' + classes_ab + '_bnft_clf_model_weights.h5'
+    bnft_clf_model_art_save_name = save_info + 'clothes_' + classes_ab + '_bnft_clf_model_art.json'
+
+    bnft_finetune_model_weights_save_name = save_info + 'clothes_' + classes_ab + '_bnft_fine_tune_model.h5'
+    bnft_finetune_model_art_save_name = save_info + 'clothes_' + classes_ab + '_bnft_fine_tune_model_art.json'
+
+    train_datagen = ImageDataGenerator(
+        rescale=1. / 255,
+        # samplewise_center=True,
+        shear_range=0,
+        rotation_range=0,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        fill_mode='nearest',
+        vertical_flip=False,
+        zoom_range=0.1,
+        horizontal_flip=True,
+    )
+
+    ## save x.train
+    # X_train, y_train = load_train_valid_pic(train_data_dir,
+    #                                         is_write=True,save_name_x='bfp_x.train',save_name_y='bfp_y.train')
+    # X_valid,y_valid = load_train_valid_pic(validation_data_dir,is_write=True,save_name_x='bfp_x.valid',save_name_y='bfp_y.valid')
+    # print('X_train shape\t:{}'.format(X_train.shape))
+    # print('X_valid shape\t:{}'.format(X_valid.shape))
+
+    ##
+    use_generator = True
+
+    get_model_ori(save_name = get_model_ori_weights_save_name,
+                  save_weights_flag = save_weights_flag,
+                  batch_size=batch_size,
+                  art_name =get_model_ori_art_save_name,
+                  use_dir_generator = use_generator)
+
+    get_v16_bnft(save_train_bn_ft_name = get_v16_bnft_train_save_name,
+                 save_valid_bn_ft_name=get_v16_bnft_valid_save_name)
+
+    get_bnft_clf_model(load_train_bn_ft_name=get_v16_bnft_train_save_name,
+                       load_valid_bn_ft_name=get_v16_bnft_valid_save_name,
+                       save_name = bnft_clf_model_weights_save_name,
+                       save_art_name = bnft_clf_model_art_save_name,
+                       save_weights_flag = save_weights_flag)
+
+    get_bnft_fine_tune_model(load_bnft_clf_name = bnft_clf_model_weights_save_name,
+                             save_name = bnft_finetune_model_weights_save_name,
+                             save_art_name=bnft_finetune_model_art_save_name,
+                             save_weights_flag=save_weights_flag,
+                             use_dir_generator = use_generator)
