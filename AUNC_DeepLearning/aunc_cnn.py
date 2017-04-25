@@ -7,7 +7,7 @@ from keras.layers import Activation, Dropout, Flatten, Dense,BatchNormalization,
 from keras.layers import Input,Lambda,ConvLSTM2D
 from keras.optimizers import RMSprop
 import os
-import cv2
+# import cv2
 import h5py
 import datetime
 import shutil
@@ -27,14 +27,19 @@ from keras.datasets import mnist
 
 
 class AUNC():
-    def __init__(self,work_path,data_name):
+    def __init__(self,work_path,data_name,time_range_start=[0]):
         self.work_path=work_path
         self.data_path=os.path.join(self.work_path,data_name)
         self.utils=Utils()
         self._init_model()
+
         self._3d_shape=(46,55,46)
         self._4d_shape=(46,55,46,1)
-        self._time_steps=10
+        self._time_steps=3
+        self.time_range_start=time_range_start
+
+        self.batch_size=8
+        self.nb_epoch = 20
 
     def __str__(self):
         print_str = "*****data info*****\n\nclass:{}\nfiles_len:{}\n"
@@ -69,15 +74,18 @@ class AUNC():
         :param path:
         :return:
         """
-        x = sio.loadmat(path)['data_4d'] #
-        x = x[:,:,:,:self._time_steps]
-        ##scaler
-        x = np.clip(x,-1000,1000)
-        x = x/1000.0
-
-        x = np.expand_dims(x,axis=-1) #(46,55,46,timestep,1)
-        x = np.transpose(x,axes=[3,0,1,2,4]) #(timestep,46,55,46,1)
-        return x
+        x = sio.loadmat(path)['data_4d']
+        x_out=[]
+        for start in self.time_range_start:
+            tmp_x = x[:,:,:,start:start+self._time_steps]
+            ##scaler
+            tmp_x=np.clip(tmp_x,-1000,1000)
+            # tmp_x = tmp_x/1000.0
+            tmp_x = np.expand_dims(tmp_x,axis=-1) #(46,55,46,timestep,1)
+            tmp_x = np.transpose(tmp_x,axes=[3,0,1,2,4]) #(timestep,46,55,46,1)
+            x_out.append(tmp_x)
+        x_out = np.array(x_out)
+        return x_out
 
     def get_Xy(self,dim_flag='2d'):
         data = []
@@ -88,9 +96,11 @@ class AUNC():
                 tmp = self.utils.get_files_array(self._load_aunc_mat, os.path.join(self.data_path, class_i))
             data += tmp
         data = np.array(data)
+        data = data.reshape((164*len(self.time_range_start),self._time_steps,46,55,46,1))
         print('data shape:{}'.format(data.shape))
 
-        label = self.utils.get_label_from_file_len(self.train_files_len)
+        new_len = [i*len(self.time_range_start) for i in self.train_files_len]
+        label = self.utils.get_label_from_file_len(new_len)
 
         return data, label
 
@@ -121,12 +131,12 @@ class AUNC():
 
     def _cnn_3d_model(self,input_shape,optimazor):
         d3_cnn = Sequential()
-        d3_cnn.add(Conv3D(64, 4,4,4,input_shape=input_shape))
+        d3_cnn.add(Conv3D(64, (4,4,4),input_shape=input_shape))
         d3_cnn.add(BatchNormalization())
         d3_cnn.add(Activation('relu'))
         d3_cnn.add(MaxPooling3D((2,2,2))) #3d pooling only used in theano
 
-        d3_cnn.add(Conv3D(64, 4, 4, 4))
+        d3_cnn.add(Conv3D(64, (4, 4, 4)))
         d3_cnn.add(BatchNormalization())
         d3_cnn.add(Activation('relu'))
         d3_cnn.add(MaxPooling3D((2,2,2)))
@@ -145,12 +155,17 @@ class AUNC():
 
     def _cnn_3d_feature(self,input_shape):
         d3_cnn = Sequential()
-        d3_cnn.add(Conv3D(64, 4, 4, 4, input_shape=input_shape))
+        d3_cnn.add(Conv3D(64, (4, 4, 4), input_shape=input_shape))
         d3_cnn.add(BatchNormalization())
         d3_cnn.add(Activation('relu'))
         d3_cnn.add(MaxPooling3D((2, 2, 2)))
 
-        d3_cnn.add(Conv3D(64, 4, 4, 4))
+        d3_cnn.add(Conv3D(64, (4, 4, 4)))
+        d3_cnn.add(BatchNormalization())
+        d3_cnn.add(Activation('relu'))
+        d3_cnn.add(MaxPooling3D((2, 2, 2)))
+
+        d3_cnn.add(Conv3D(128, (8, 8, 8)))
         d3_cnn.add(BatchNormalization())
         d3_cnn.add(Activation('relu'))
         d3_cnn.add(MaxPooling3D((2, 2, 2)))
@@ -210,26 +225,22 @@ class AUNC():
         return X_data,y
 
 
-
-
-
-
-    def model_fit(self,model,X_train,y_train,batch_size=16,epoch=20,verbose=1):
+    def model_fit(self,model,X_train,y_train,batch_size=8,epoch=20,verbose=1):
         model_history = model.fit(X_train, y_train,
                   batch_size=batch_size,
                   epochs=epoch,
                   verbose=verbose,
-                  validation_split=0.1,
+                  validation_split=0.2,
                   shuffle=True)
+        print(model.summary())
         return model_history
 
-
-
+    def _batch_generator(self):
 
 
 
 if __name__=='__main__':
-    Test = AUNC('/Users/l_mahome/Documents/py3_my_project/AUNC_DeepLearning','data')
+    # Test = AUNC('/Users/l_mahome/Documents/py3_my_project/AUNC_DeepLearning','data')
     # print(Test)
     # X,y = Test.get_Xy()
     # print(y)
@@ -239,12 +250,24 @@ if __name__=='__main__':
     # # print(sum(X[0, 0, :]))
     # a=X[0,:,11]
     # print(sum(a))
-
-    D3=AUNC('/Users/l_mahome/Documents/py3_my_project/AUNC_DeepLearning','data_4d')
+    time_range_start=range(0,30,3)
+    D3=AUNC('/media/s/Data/LIAOLuo/AUNC_DeepLearning/','AUNC_oridata_mat_3d_46_55_46',time_range_start=list(time_range_start))
+    print(D3)
+    D3._time_steps=3
     model=D3.multi_time_3dcnn()
     X,y=D3.get_data4d_multi_3nn_Xy()
-    print(np.max(X[0]),np.min(X[0]))
+    #
+    # xyfile=h5py.File('AUNC4d_TimeStep10.h5','w')
+    # xyfile.create_dataset('X',data=X)
+    # xyfile.create_dataset('y',data=y)
+    #
+    # xyfile = h5py.File('AUNC4d_TimeStep10.h5', 'r')
+    # X=xyfile['X'][:]
+    # y=xyfile['y'][:]
+    # X_data = []
+    # for i in range(10):
+    #     X_data.append(X[i,:, :, :, :, :])
+    D3.model_fit(model,X,y,epoch=6)
 
-    # D3.model_fit(model,X,y,epoch=2)
 
 
