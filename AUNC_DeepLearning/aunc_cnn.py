@@ -27,29 +27,40 @@ from keras.datasets import mnist
 
 
 class AUNC():
-    def __init__(self,work_path,data_name,time_range_start=[0]):
-        self.work_path=work_path
-        self.data_path=os.path.join(self.work_path,data_name)
+    def __init__(self,train_path,test_path,time_range_start,time_step=3,batch_size=8,nb_epoch=20,random_state=2017):
+        self.train_path=train_path
+        self.test_path=test_path
+
         self.utils=Utils()
-        self._init_model()
+        np.random.seed(random_state)
 
         self._3d_shape=(46,55,46)
         self._4d_shape=(46,55,46,1)
-        self._time_steps=3
-        self.time_range_start=time_range_start
+        self.time_steps=time_step #set time_step input for model
+        self.time_range_start=time_range_start  #each num time_range_start is a new sample for the 170
 
-        self.batch_size=8
-        self.nb_epoch = 20
+        self.batch_size=batch_size
+        self.nb_epoch = nb_epoch
+
+        self._init_model()
 
     def __str__(self):
         print_str = "*****data info*****\n\nclass:{}\nfiles_len:{}\n"
         return print_str.format(self.true_class,self.train_files_len)
 
     def _init_model(self):
-        self.true_class = self.utils.get_files_name(self.data_path)
+        self.true_class = self.utils.get_files_name(self.train_path)
         self.nb_classes = len(self.true_class)
         self.class_str2num,self.class_num2str=self.utils.build_trueclass_strnum(self.true_class)
-        self.train_files_len = list(map(lambda x: self.utils.get_files_len(os.path.join(self.data_path, x)), self.true_class))
+
+        self.train_files_len = self.utils.get_traintest_files_len(self.train_path,self.true_class)
+        self.test_files_len = self.utils.get_traintest_files_len(self.test_path,self.true_class)
+
+        self.train_samples_len = [i * len(self.time_range_start) for i in self.train_files_len]
+        self.test_samples_len = [i * len(self.time_range_start) for i in self.test_files_len]
+
+        self.train_files_name=list(map(lambda x:self.utils.get_files_name(os.path.join(self.train_path,x)),self.true_class))
+        self.test_files_name=list(map(lambda x:self.utils.get_files_name(os.path.join(self.test_path,x)),self.true_class))
 
         if self.nb_classes == 2:
             self._loss = 'binary_crossentropy'
@@ -70,36 +81,45 @@ class AUNC():
 
     def _load_aunc_mat_4d(self,path):
         """
-        (46,55,46,170) ->(self._time_steps,46,55,46,1)
+        (46,55,46,170) ->(self.time_steps,46,55,46,1)
         :param path:
         :return:
         """
         x = sio.loadmat(path)['data_4d']
         x_out=[]
         for start in self.time_range_start:
-            tmp_x = x[:,:,:,start:start+self._time_steps]
+            tmp_x = x[:,:,:,start:start+self.time_steps]
             ##scaler
             tmp_x=np.clip(tmp_x,-1000,1000)
-            # tmp_x = tmp_x/1000.0
+            tmp_x = tmp_x/1000.0
             tmp_x = np.expand_dims(tmp_x,axis=-1) #(46,55,46,timestep,1)
             tmp_x = np.transpose(tmp_x,axes=[3,0,1,2,4]) #(timestep,46,55,46,1)
             x_out.append(tmp_x)
         x_out = np.array(x_out)
         return x_out
 
-    def get_Xy(self,dim_flag='2d'):
+    def get_Xy(self,file_path,dim_flag='2d'):
+        """
+
+        :param file_path: train_path or test_path
+        :param dim_flag:
+        :return:
+        """
         data = []
         for class_i in self.true_class:
             if dim_flag=='4d':
-                tmp=self.utils.get_files_array(self._load_aunc_mat_4d,os.path.join(self.data_path,class_i))
+                tmp=self.utils.get_files_array(self._load_aunc_mat_4d,os.path.join(file_path,class_i))
             else:
-                tmp = self.utils.get_files_array(self._load_aunc_mat, os.path.join(self.data_path, class_i))
+                tmp = self.utils.get_files_array(self._load_aunc_mat, os.path.join(file_path, class_i))
             data += tmp
         data = np.array(data)
-        data = data.reshape((164*len(self.time_range_start),self._time_steps,46,55,46,1))
-        print('data shape:{}'.format(data.shape))
 
-        new_len = [i*len(self.time_range_start) for i in self.train_files_len]
+        #because time_step feature will be a sample so should reshape
+        files_len=self.utils.get_traintest_files_len(file_path,self.true_class) #
+        data = data.reshape((sum(files_len)*len(self.time_range_start),self.time_steps,46,55,46,1))#
+        print('data shape:{}'.format(data.shape))
+        new_len = [i*len(self.time_range_start) for i in files_len] #
+
         label = self.utils.get_label_from_file_len(new_len)
 
         return data, label
@@ -183,7 +203,7 @@ class AUNC():
         cnn3d_fea=[]
         input_tensor=[]
 
-        for i in range(self._time_steps):
+        for i in range(self.time_steps):
             tmp_input=Input(self._4d_shape)
             input_tensor.append(tmp_input)
 
@@ -219,7 +239,7 @@ class AUNC():
         """
         X,y=self.get_Xy(dim_flag='4d')
         X_data = []
-        for i in range(self._time_steps):
+        for i in range(self.time_steps):
             X_data.append(X[:, i, :, :, :, :])
 
         return X_data,y
@@ -235,8 +255,124 @@ class AUNC():
         print(model.summary())
         return model_history
 
-    def _batch_generator(self):
+    def _batch_generator(self,train_test_flag='train'):
+        if train_test_flag=='train':
+            while 1:
+                _tmp_idx = np.random.choice(np.arange(sum(self.train_samples_len)),size=self.batch_size,replace=False)
 
+                x_out = []
+                y_out = []
+                for idx in _tmp_idx:
+                    # print(idx)
+                    if idx<self.train_samples_len[0]:
+                        _class='AU'
+                    else:
+                        _class='NC'
+                        idx = idx-self.train_samples_len[0]
+
+                    path = os.path.join(self.train_path,_class)
+
+                    _sub=idx//len(self.time_range_start)
+                    _time_start=idx%len(self.time_range_start)
+                    # print(_sub,_time_start)
+
+                    path=os.path.join(path,self.train_files_name[self.class_str2num[_class]][_sub])
+                    x = sio.loadmat(path)['data_4d']
+                    # print(path)
+
+                    tmp_x = x[:, :, :, self.time_range_start[_time_start]:self.time_range_start[_time_start] + self.time_steps]
+                    ##scaler
+                    tmp_x = np.clip(tmp_x, -1000, 1000)
+                    tmp_x = tmp_x / 1000.0
+                    tmp_x = np.expand_dims(tmp_x, axis=-1)  # (46,55,46,timestep,1)
+                    tmp_x = np.transpose(tmp_x, axes=[3, 0, 1, 2, 4])  # (timestep,46,55,46,1)
+                    x_out.append(tmp_x) #(batcnsize,timestep,46,55,46,1)
+                    y_out.append(self.class_str2num[_class] )
+
+                x_out = np.array(x_out)
+                # x_out: [[batchsize,46,55,46,1],[batchsize,46,55,46,1],...,]total self.time_steps
+                tmp = []
+                for t in range(self.time_steps):
+                    tmp.append(x_out[:,t, :, :, :, :])
+
+                yield (tmp,np.array(y_out))
+        elif train_test_flag=='test':
+            while 1:
+                _tmp_idx = np.random.choice(np.arange(sum(self.test_samples_len)), size=self.batch_size, replace=False)
+
+                x_out = []
+                y_out = []
+                for idx in _tmp_idx:
+                    if idx < self.test_samples_len[0]:
+                        _class = 'AU'
+                    else:
+                        _class = 'NC'
+                        idx = idx - self.train_samples_len[0]
+
+                    path = os.path.join(self.test_path, _class)
+
+                    _sub = idx // len(self.time_range_start)
+                    _time_start = idx % len(self.time_range_start)
+
+                    path = os.path.join(path, self.test_files_name[self.class_str2num[_class]][_sub])
+                    x = sio.loadmat(path)['data_4d']
+
+                    tmp_x = x[:, :, :,self.time_range_start[_time_start]:self.time_range_start[_time_start] + self.time_steps]
+                    ##scaler
+                    tmp_x = np.clip(tmp_x, -1000, 1000)
+                    tmp_x = tmp_x / 1000.0
+                    tmp_x = np.expand_dims(tmp_x, axis=-1)  # (46,55,46,timestep,1)
+                    tmp_x = np.transpose(tmp_x, axes=[3, 0, 1, 2, 4])  # (timestep,46,55,46,1)
+
+                    x_out.append(tmp_x)
+                    y_out.append(self.class_str2num[_class])
+
+                x_out = np.array(x_out)
+                # x_out: [[batchsize,46,55,46,1],[batchsize,46,55,46,1],...,]total self.time_steps
+                tmp = []
+                for t in range(self.time_steps):
+                    tmp.append(x_out[:, t, :, :, :, :])
+
+                yield (tmp, np.array(y_out))
+        else:
+            raise(BaseException)
+
+    def model_fit_generator(self,model):
+        model.fit_generator(generator=self._batch_generator('train'),
+                            steps_per_epoch=sum(self.train_samples_len)//self.batch_size,
+                            epochs=self.nb_epoch,
+                            validation_data=self._batch_generator('test'),
+                            validation_steps=sum(self.test_samples_len)//self.batch_size,
+                            )
+
+        # for e in range(self.nb_epoch):
+        #     print('Epoch {}'.format(e))
+        #     batches=0
+        #     test_gene = self._batch_generator('test')
+        #     for X_batch,y_batch in self._batch_generator('train'):
+        #         _loss_tr = model.train_on_batch(X_batch,y_batch)
+        #         for test_xy in test_gene:
+        #             _loss_te = model.test_on_batch(test_xy[0],test_xy[1])
+        #             break
+        #         print('train : {},{}'.format(_loss_tr[0],_loss_tr[1]))
+        #         print('test : {},{}'.format(_loss_te[0], _loss_te[1]))
+        #         batches+=1
+        #         if batches>=sum(self.train_samples_len)//self.batch_size:
+        #             break
+
+
+    def _write_Xy_h5file(self,X,y,filename=None):
+        if filename is None:
+            filename='AUNC4d_TimeStep{}.h5'.format(self.time_steps)
+        xyfile=h5py.File(filename,'w')
+        xyfile.create_dataset('X',data=X)
+        xyfile.create_dataset('y',data=y)
+
+    def _read_Xy_h5file(self,filename):
+        xyfile = h5py.File(filename,'r')
+        X=xyfile['X']
+        y=xyfile['y']
+        return X,y
 
 
 if __name__=='__main__':
@@ -250,24 +386,25 @@ if __name__=='__main__':
     # # print(sum(X[0, 0, :]))
     # a=X[0,:,11]
     # print(sum(a))
-    time_range_start=range(0,30,3)
-    D3=AUNC('/media/s/Data/LIAOLuo/AUNC_DeepLearning/','AUNC_oridata_mat_3d_46_55_46',time_range_start=list(time_range_start))
+    time_step = 5
+    time_range_start=range(0,120,time_step)
+    D3=AUNC('/media/s/Data/LIAOLuo/AUNC_DeepLearning/AUNC_oridata_mat_3d_46_55_46/train',
+            '/media/s/Data/LIAOLuo/AUNC_DeepLearning/AUNC_oridata_mat_3d_46_55_46/train',
+            time_range_start=list(time_range_start),
+            time_step=time_step,
+            batch_size=8
+            )
     print(D3)
-    D3._time_steps=3
+    print(' total samples:{} iter per opoch :{}'.format(sum(D3.train_samples_len),sum(D3.train_samples_len)//D3.batch_size))
     model=D3.multi_time_3dcnn()
-    X,y=D3.get_data4d_multi_3nn_Xy()
-    #
-    # xyfile=h5py.File('AUNC4d_TimeStep10.h5','w')
-    # xyfile.create_dataset('X',data=X)
-    # xyfile.create_dataset('y',data=y)
-    #
-    # xyfile = h5py.File('AUNC4d_TimeStep10.h5', 'r')
-    # X=xyfile['X'][:]
-    # y=xyfile['y'][:]
-    # X_data = []
-    # for i in range(10):
-    #     X_data.append(X[i,:, :, :, :, :])
-    D3.model_fit(model,X,y,epoch=6)
+    # X,y=D3.get_data4d_multi_3nn_Xy()
+    # #
+    # # X_data = []
+    # # for i in range(10):
+    # #     X_data.append(X[i,:, :, :, :, :])
+    # D3.model_fit(model,X,y,epoch=6)
+
+    D3.model_fit_generator(model=model)
 
 
 
